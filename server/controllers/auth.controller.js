@@ -18,33 +18,57 @@ export const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    const existedUser = await User.findOne({ email });
-    if (existedUser) {
-      return res.status(400).json({ message: "Email already used" });
-    }
+    const user = await User.findOne({ email });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate OTP (6-digit)
+    // Create NEW OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 min
 
-    const newUser = await User.create({
+    if (user && user.isVerified) {
+      return res.status(400).json({ message: "User already exist" });
+    }
+
+    if (user && !user.isVerified) {
+      user.name = name;
+      user.password = hashedPassword;
+      user.otpCode = otp;
+      user.otpExpires = otpExpires;
+
+      await user.save();
+
+      await transporter.sendMail({
+        from: `"Email Verification" <${process.env.GMAIL_USER}>`,
+        to: email,
+        subject: "Your Verification Code",
+        html: `
+          <h2>Your Verification Code</h2>
+          <h1 style="font-size: 32px">${otp}</h1>
+          <p>This code will expire in 10 minutes.</p>
+        `,
+      });
+
+      return res.json({
+        message: "Existing unverified user found. New OTP sent.",
+      });
+    }
+
+    await User.create({
       name,
       email,
       password: hashedPassword,
       otpCode: otp,
-      otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
+      otpExpires,
     });
 
-    // SEND OTP EMAIL
     await transporter.sendMail({
       from: `"Email Verification" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: "Your Verification Code",
       html: `
         <h2>Your Verification Code</h2>
-        <p>Enter this code to verify your account:</p>
-        <h1 style="font-size: 32px; letter-spacing: 4px;">${otp}</h1>
+        <h1 style="font-size: 32px">${otp}</h1>
         <p>This code will expire in 10 minutes.</p>
       `,
     });
