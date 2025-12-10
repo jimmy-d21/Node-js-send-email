@@ -1,5 +1,4 @@
 import User from "../models/user.model.js";
-import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
@@ -39,7 +38,7 @@ export const registerUser = async (req, res) => {
 
     // SEND OTP EMAIL
     await transporter.sendMail({
-      from: `"My App" <${process.env.GMAIL_USER}>`,
+      from: `"Email Verification" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: "Your Verification Code",
       html: `
